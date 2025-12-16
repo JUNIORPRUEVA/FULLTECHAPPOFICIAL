@@ -78,7 +78,7 @@ async function createQuote({ cliente_id, fecha_vencimiento, items, notas }, user
     const quoteQ = await client.query(
       `INSERT INTO cotizaciones (cliente_id, usuario_id, fecha_vencimiento, monto_total, notas)
        VALUES ($1, $2, $3, $4, $5)
-       RETURNING id, fecha_emision, fecha_vencimiento, monto_total, estado`,
+       RETURNING id, fecha AS fecha_emision, fecha_vencimiento, monto_total, estado`,
       [cliente_id || null, userId, fecha_vencimiento || null, total, notas || null]
     );
 

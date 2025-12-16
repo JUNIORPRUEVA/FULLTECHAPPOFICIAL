@@ -22,7 +22,7 @@ async function create(req, res, next) {
   try {
     const data = { ...req.body };
     if (req.file) {
-      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const baseUrl = process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get('host')}`;
       data.imagen_url = `${baseUrl}/uploads/products/${req.file.filename}`;
       console.log(`Imagen subida: ${req.file.path}, URL: ${data.imagen_url}`);
     }
@@ -38,7 +38,7 @@ async function update(req, res, next) {
   try {
     const data = { ...req.body };
     if (req.file) {
-      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const baseUrl = process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get('host')}`;
       data.imagen_url = `${baseUrl}/uploads/products/${req.file.filename}`;
       console.log(`Imagen actualizada: ${req.file.path}, URL: ${data.imagen_url}`);
     }
