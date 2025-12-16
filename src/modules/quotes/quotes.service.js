@@ -2,12 +2,11 @@ const { pool } = require("../../config/db");
 
 async function getAllQuotes() {
   const q = await pool.query(
-    `SELECT q.id, q.fecha_emision, q.fecha_vencimiento, q.monto_total, q.estado, q.notas,
-            q.cliente_id, c.nombre as cliente_nombre, u.nombre as usuario_nombre
+    `SELECT q.id, q.codigo, q.fecha, q.total, q.estado, q.notas,
+            q.cliente_id, c.nombre as cliente_nombre
      FROM cotizaciones q
      LEFT JOIN clientes c ON q.cliente_id = c.id
-     LEFT JOIN usuarios u ON q.usuario_id = u.id
-     ORDER BY q.fecha_emision DESC`,
+     ORDER BY q.fecha DESC`,
     []
   );
   return q.rows;
@@ -15,11 +14,10 @@ async function getAllQuotes() {
 
 async function getQuoteById(id) {
   const quoteQ = await pool.query(
-    `SELECT q.id, q.fecha_emision, q.fecha_vencimiento, q.monto_total, q.estado, q.notas,
-            q.cliente_id, c.nombre as cliente_nombre, u.nombre as usuario_nombre
+    `SELECT q.id, q.codigo, q.fecha, q.total, q.estado, q.notas,
+            q.cliente_id, c.nombre as cliente_nombre
      FROM cotizaciones q
      LEFT JOIN clientes c ON q.cliente_id = c.id
-     LEFT JOIN usuarios u ON q.usuario_id = u.id
      WHERE q.id = $1`,
     [id]
   );
