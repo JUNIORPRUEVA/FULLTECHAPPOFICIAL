@@ -21,6 +21,10 @@ dependencies:
   # API / INTEGRACIÓN NUBE
   http: ^1.2.1
 
+  # FILE PICKING
+  file_picker: ^8.0.0+1
+  image_picker: ^1.0.4
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
