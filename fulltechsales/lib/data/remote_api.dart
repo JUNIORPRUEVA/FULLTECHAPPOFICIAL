@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
+import 'package:mime/mime.dart';
 import 'cliente_model.dart';
 import 'producto_model.dart';
 
@@ -64,10 +65,12 @@ class RemoteAPI {
 
     // Agregar imagen
     if (image != null) {
+      final mimeType = lookupMimeType(image.path);
+      final mediaType = mimeType != null ? MediaType.parse(mimeType) : MediaType('image', 'jpeg');
       request.files.add(await http.MultipartFile.fromPath(
         'image',
         image.path,
-        contentType: MediaType('image', image.path.split('.').last),
+        contentType: mediaType,
       ));
     }
 
@@ -79,6 +82,9 @@ class RemoteAPI {
       if (data['ok'] == true) {
         return Producto.fromJson(data['product']);
       }
+    } else if (response.statusCode == 400) {
+      final data = jsonDecode(response.body);
+      throw Exception(data['message'] ?? 'Error al crear producto');
     }
     throw Exception('Failed to create product');
   }
@@ -99,10 +105,12 @@ class RemoteAPI {
 
     // Agregar imagen
     if (image != null) {
+      final mimeType = lookupMimeType(image.path);
+      final mediaType = mimeType != null ? MediaType.parse(mimeType) : MediaType('image', 'jpeg');
       request.files.add(await http.MultipartFile.fromPath(
         'image',
         image.path,
-        contentType: MediaType('image', image.path.split('.').last),
+        contentType: mediaType,
       ));
     }
 
@@ -114,6 +122,9 @@ class RemoteAPI {
       if (data['ok'] == true) {
         return Producto.fromJson(data['product']);
       }
+    } else if (response.statusCode == 400) {
+      final data = jsonDecode(response.body);
+      throw Exception(data['message'] ?? 'Error al actualizar producto');
     }
     throw Exception('Failed to update product');
   }

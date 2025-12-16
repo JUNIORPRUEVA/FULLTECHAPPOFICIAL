@@ -20,6 +20,8 @@ dependencies:
 
   # API / INTEGRACIÓN NUBE
   http: ^1.2.1
+  mime: ^1.0.4
+  http_parser: ^4.0.2
 
   # FILE PICKING
   file_picker: ^8.0.0+1

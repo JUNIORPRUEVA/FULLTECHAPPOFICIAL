@@ -55,9 +55,10 @@ class _ProductoFormScreenState extends State<ProductoFormScreen> {
 
   Future<void> _pickImage() async {
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-      // Desktop: usar file_picker
+      // Desktop: usar file_picker con extensiones limitadas
       FilePickerResult? result = await FilePicker.platform.pickFiles(
-        type: FileType.image,
+        type: FileType.custom,
+        allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
         allowMultiple: false,
       );
       if (result != null) {

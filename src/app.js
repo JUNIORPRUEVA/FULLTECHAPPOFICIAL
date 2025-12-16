@@ -21,13 +21,14 @@ app.use(cors());
 app.use(express.json({ limit: "2mb" }));
 
 // Crear directorio uploads si no existe
-const uploadsDir = path.join(__dirname, 'uploads', 'products');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
+const isProduction = process.env.NODE_ENV === 'production';
+const uploadsPath = isProduction ? '/app/uploads' : path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsPath)) {
+  fs.mkdirSync(uploadsPath, { recursive: true });
 }
 
 // Servir archivos estáticos de uploads (público, sin auth)
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', express.static(uploadsPath));
 
 // Health check
 app.get("/", (req, res) => res.json({ ok: true, service: "fulltech-backend" }));

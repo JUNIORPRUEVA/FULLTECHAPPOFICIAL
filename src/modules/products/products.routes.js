@@ -12,7 +12,9 @@ const { createProductSchema, updateProductSchema } = require("./products.schema"
 // Configuración de multer
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, path.join(__dirname, '../../uploads/products'));
+    const isProduction = process.env.NODE_ENV === 'production';
+    const uploadPath = isProduction ? '/app/uploads/products' : path.join(__dirname, '../../uploads/products');
+    cb(null, uploadPath);
   },
   filename: (req, file, cb) => {
     const timestamp = Date.now();
@@ -25,9 +27,8 @@ const storage = multer.diskStorage({
 const fileFilter = (req, file, cb) => {
   const allowedTypes = /jpeg|jpg|png|webp/;
   const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-  const mimetype = allowedTypes.test(file.mimetype);
 
-  if (mimetype && extname) {
+  if (extname) {
     return cb(null, true);
   } else {
     cb(new Error('Solo se permiten imágenes: jpeg, jpg, png, webp'));
