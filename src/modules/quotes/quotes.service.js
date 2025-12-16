@@ -1,11 +1,8 @@
 const { pool } = require("../../config/db");
 
-/**
- * NOTA IMPORTANTE (para no volver a caer):
- * - En la BD la columna real es: cotizaciones.fecha
- * - Si tu frontend espera fecha_emision, se resuelve con ALIAS:
- *   q.fecha AS fecha_emision
- */
+// ✅ Tablas reales en tu BD
+const QUOTES_TABLE = "cotizaciones";
+const DETAILS_TABLE = "cotizacion_detalle";
 
 async function getAllQuotes() {
   const q = await pool.query(
@@ -13,18 +10,17 @@ async function getAllQuotes() {
     SELECT
       q.id,
       q.codigo,
-      q.fecha AS fecha_emision,
-      q.fecha AS fecha,
+      q.fecha,
+      q.fecha AS fecha_emision,         -- ✅ alias para compatibilidad (pero la columna real es fecha)
       q.subtotal,
       q.descuento,
       q.itbis,
-      q.total AS monto_total,
       q.total,
       q.estado,
       q.notas,
       q.cliente_id,
       c.nombre AS cliente_nombre
-    FROM cotizaciones q
+    FROM ${QUOTES_TABLE} q
     LEFT JOIN clientes c ON q.cliente_id = c.id
     ORDER BY q.fecha DESC, q.id DESC
     `,
@@ -40,18 +36,17 @@ async function getQuoteById(id) {
     SELECT
       q.id,
       q.codigo,
+      q.fecha,
       q.fecha AS fecha_emision,
-      q.fecha AS fecha,
       q.subtotal,
       q.descuento,
       q.itbis,
-      q.total AS monto_total,
       q.total,
       q.estado,
       q.notas,
       q.cliente_id,
       c.nombre AS cliente_nombre
-    FROM cotizaciones q
+    FROM ${QUOTES_TABLE} q
     LEFT JOIN clientes c ON q.cliente_id = c.id
     WHERE q.id = $1
     LIMIT 1
@@ -65,20 +60,23 @@ async function getQuoteById(id) {
     throw err;
   }
 
-  // OJO: si en tu BD la tabla se llama diferente, cámbiala aquí.
   const detailsQ = await pool.query(
     `
     SELECT
-      dq.id,
-      dq.producto_id,
+      d.id,
+      d.cotizacion_id,
+      d.producto_id,
       p.nombre AS producto_nombre,
-      dq.cantidad,
-      dq.precio_unitario,
-      dq.subtotal
-    FROM detalle_cotizaciones dq
-    LEFT JOIN productos p ON dq.producto_id = p.id
-    WHERE dq.cotizacion_id = $1
-    ORDER BY dq.id ASC
+      d.descripcion,
+      d.cantidad,
+      d.precio,
+      d.costo,
+      d.itbis,
+      d.total
+    FROM ${DETAILS_TABLE} d
+    LEFT JOIN productos p ON d.producto_id = p.id
+    WHERE d.cotizacion_id = $1
+    ORDER BY d.id ASC
     `,
     [id]
   );
@@ -90,104 +88,94 @@ async function getQuoteById(id) {
 }
 
 /**
- * Crea cotización con:
- * - fecha_emision = NOW()
- * - subtotal = total calculado
- * - descuento=0, itbis=0 (ajusta si lo usas)
- *
- * IMPORTANTE:
- * - Removí fecha_vencimiento y monto_total porque en tu esquema real suelen NO existir.
+ * createQuote() ajustado a TU esquema real:
+ * - cotizaciones: (codigo, cliente_id, fecha, subtotal, descuento, itbis, total, notas, estado, usuario_id)
+ * - cotizacion_detalle: (cotizacion_id, producto_id, descripcion, cantidad, precio, costo, itbis, total)
  */
-async function createQuote({ cliente_id, items, notas, codigo }, userId) {
+async function createQuote({ codigo, cliente_id, items = [], notas, descuento = 0, itbis = 0 }, userId) {
   const client = await pool.connect();
 
   try {
     await client.query("BEGIN");
 
-    // Calcular total desde productos
+    // ✅ Calculamos subtotal/total basado en items
     let subtotal = 0;
-    const itemDetails = [];
 
-    for (const item of items || []) {
-      const productQ = await client.query(
-        "SELECT nombre, precio, costo FROM productos WHERE id = $1",
-        [item.producto_id]
-      );
+    const cleanItems = items.map((it) => {
+      const cantidad = Number(it.cantidad ?? 0);
+      const precio = Number(it.precio ?? it.precio_unitario ?? 0);
+      const costo = Number(it.costo ?? 0);
+      const itbisLinea = Number(it.itbis ?? 0);
+      const totalLinea = Number(it.total ?? (cantidad * precio));
 
-      if (productQ.rowCount === 0) {
-        throw new Error(`Producto ${item.producto_id} no encontrado`);
-      }
+      subtotal += totalLinea;
 
-      const product = productQ.rows[0];
-      const precioUnitario = Number(product.precio || 0);
-      const cantidad = Number(item.cantidad || 0);
-
-      const lineSubtotal = precioUnitario * cantidad;
-      subtotal += lineSubtotal;
-
-      itemDetails.push({
-        producto_id: item.producto_id,
+      return {
+        producto_id: it.producto_id ?? it.productoId ?? null,
+        descripcion: (it.descripcion ?? "").toString(),
         cantidad,
-        precio_unitario: precioUnitario,
-        subtotal: lineSubtotal,
-      });
-    }
+        precio,
+        costo,
+        itbis: itbisLinea,
+        total: totalLinea,
+      };
+    });
 
-    const descuento = 0;
-    const itbis = 0;
-    const total = subtotal - descuento + itbis;
+    const descuentoNum = Number(descuento ?? 0);
+    const itbisNum = Number(itbis ?? 0);
 
-    // Insert header (ajustado a columnas reales comunes)
+    // total = subtotal - descuento + itbis
+    const total = subtotal - descuentoNum + itbisNum;
+
+    // ✅ Insert header con columnas reales
     const quoteQ = await client.query(
       `
-      INSERT INTO cotizaciones
-        (codigo, cliente_id, usuario_id, owner_id, fecha, subtotal, descuento, itbis, total, notas, estado)
+      INSERT INTO ${QUOTES_TABLE}
+        (codigo, cliente_id, fecha, subtotal, descuento, itbis, total, notas, estado, usuario_id)
       VALUES
-        ($1,     $2,         $3,        $4,      NOW(), $5,       $6,        $7,   $8,    $9,   'PENDIENTE')
+        ($1,     $2,        NOW(), $3,       $4,        $5,    $6,    $7,    'PENDIENTE', $8)
       RETURNING
-        id,
-        codigo,
-        fecha AS fecha_emision,
-        fecha,
-        subtotal,
-        descuento,
-        itbis,
-        total AS monto_total,
-        total,
-        estado,
-        notas,
-        cliente_id
+        id, codigo, fecha, fecha AS fecha_emision, subtotal, descuento, itbis, total, estado, notas, cliente_id
       `,
       [
-        codigo || null,
-        cliente_id || null,
-        userId || null,
-        String(userId || ""), // owner_id como string (si no lo usas, pon null)
+        codigo ?? null,
+        cliente_id ?? null,
         subtotal,
-        descuento,
-        itbis,
+        descuentoNum,
+        itbisNum,
         total,
-        notas || null,
+        notas ?? null,
+        userId ?? null,
       ]
     );
 
     const quote = quoteQ.rows[0];
 
-    // Insert details
-    for (const item of itemDetails) {
+    // ✅ Insert detalles en cotizacion_detalle (columnas reales)
+    for (const item of cleanItems) {
       await client.query(
         `
-        INSERT INTO detalle_cotizaciones
-          (cotizacion_id, producto_id, cantidad, precio_unitario, subtotal)
+        INSERT INTO ${DETAILS_TABLE}
+          (cotizacion_id, producto_id, descripcion, cantidad, precio, costo, itbis, total)
         VALUES
-          ($1,            $2,         $3,       $4,             $5)
+          ($1,           $2,         $3,          $4,       $5,     $6,    $7,    $8)
         `,
-        [quote.id, item.producto_id, item.cantidad, item.precio_unitario, item.subtotal]
+        [
+          quote.id,
+          item.producto_id,
+          item.descripcion,
+          item.cantidad,
+          item.precio,
+          item.costo,
+          item.itbis,
+          item.total,
+        ]
       );
     }
 
     await client.query("COMMIT");
-    return { ...quote, items: itemDetails };
+
+    return { ...quote, items: cleanItems };
   } catch (e) {
     await client.query("ROLLBACK");
     throw e;
@@ -198,7 +186,7 @@ async function createQuote({ cliente_id, items, notas, codigo }, userId) {
 
 async function updateQuoteStatus(id, estado) {
   const q = await pool.query(
-    "UPDATE cotizaciones SET estado = $1 WHERE id = $2 RETURNING id, estado",
+    `UPDATE ${QUOTES_TABLE} SET estado = $1 WHERE id = $2 RETURNING id, estado`,
     [estado, id]
   );
 
@@ -217,9 +205,9 @@ async function deleteQuote(id) {
   try {
     await client.query("BEGIN");
 
-    await client.query("DELETE FROM detalle_cotizaciones WHERE cotizacion_id = $1", [id]);
+    await client.query(`DELETE FROM ${DETAILS_TABLE} WHERE cotizacion_id = $1`, [id]);
 
-    const quoteQ = await client.query("DELETE FROM cotizaciones WHERE id = $1", [id]);
+    const quoteQ = await client.query(`DELETE FROM ${QUOTES_TABLE} WHERE id = $1`, [id]);
 
     if (quoteQ.rowCount === 0) {
       const err = new Error("Cotización no encontrada");
@@ -228,7 +216,6 @@ async function deleteQuote(id) {
     }
 
     await client.query("COMMIT");
-    return { ok: true };
   } catch (e) {
     await client.query("ROLLBACK");
     throw e;
