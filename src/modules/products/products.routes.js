@@ -13,7 +13,7 @@ const { createProductSchema, updateProductSchema } = require("./products.schema"
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const isProduction = process.env.NODE_ENV === 'production';
-    const uploadPath = isProduction ? '/app/uploads/products' : path.join(__dirname, '../../uploads/products');
+    const uploadPath = isProduction ? '/workspace/uploads/products' : path.join(__dirname, '../../uploads/products');
     cb(null, uploadPath);
   },
   filename: (req, file, cb) => {

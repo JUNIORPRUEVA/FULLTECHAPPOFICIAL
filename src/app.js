@@ -22,7 +22,7 @@ app.use(express.json({ limit: "2mb" }));
 
 // Crear directorio uploads si no existe
 const isProduction = process.env.NODE_ENV === 'production';
-const uploadsPath = isProduction ? '/app/uploads' : path.join(__dirname, 'uploads');
+const uploadsPath = isProduction ? '/workspace/uploads' : path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsPath)) {
   fs.mkdirSync(uploadsPath, { recursive: true });
 }
